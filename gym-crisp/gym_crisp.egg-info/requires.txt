@@ -1,0 +1,6 @@
+gym
+numpy
+matplotlib
+flask
+PyJWT
+hashids
