@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from gym import wrappers
 from gym.wrappers.filter_observation import FilterObservation
+from gym.wrappers import FlattenObservation
+# from stable_baselines import PPO2, PPO, GAIL
+from stable_baselines.common.env_checker import check_env
+
 
 def callback(locals_, globals_):
     self_ = locals_['self']
@@ -25,9 +29,11 @@ if __name__ == '__main__':
 
     # Create and wrap the environment
     # env = gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60)
-    env = FilterObservation(gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60),
-                            filter_keys=['inventory', 'demand-hc1', 'demand-hc2', 'on-order',
-                                         'shipment', 'suggestion', 'outl'])
+    env = FlattenObservation(FilterObservation(gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60),
+                                               filter_keys=['inventory', 'demand-hc1', 'demand-hc2', 'on-order',
+                                                            'shipment', 'suggestion', 'outl']))
+    # check_env(env)
+
     prob = []
     action_list = []
     reward_list = []

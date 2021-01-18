@@ -3,12 +3,12 @@ import numpy as np
 import pandas as pd
 from gym import spaces
 from gym.utils import seeding
-from crisp_game_server.server import simulation_builder
-from crisp.simulator.decision import TreatDecision
-from crisp.simulator.decision import OrderDecision
-from crisp.simulator.decision import ProduceDecision
-from crisp.simulator.decision import AllocateDecision
-
+from server import simulation_builder
+from simulator.decision import TreatDecision
+from simulator.decision import OrderDecision
+from simulator.decision import ProduceDecision
+from simulator.decision import AllocateDecision
+from collections import OrderedDict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,24 +34,31 @@ class CrispEnv2(gym.Env):
         self.reward = 0
         self.order = 0
         self.total_reward = 0
+        self.allocation_n = 3
         self.min_order = 0
-        self.max_order = 300
+        self.max_order = 400
         self.observation_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
                                  'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
         # self.action_space = spaces.Box(
         #     low=self.min_order, high=self.max_order, shape=(1,), dtype=np.float32)
         # self.action_space = spaces.Discrete(1000)
         # self.action_space = spaces.Tuple([spaces.Discrete(3), spaces.Discrete(self.max_order)])
-        self.action_space = spaces.MultiDiscrete([3, self.max_order])
+        self.action_space = spaces.MultiDiscrete([self.allocation_n, self.max_order])
         # self.observation_space = spaces.Box(
         #     low=np.array([0, 0, 0, 0]), high=np.array([self.max_order, self.max_order, self.max_order, self.max_order]),
         #     dtype=np.float32)
-        self.observation_space = spaces.Dict({
-            name: (spaces.Box(shape=(1,), low=0, high=self.max_order, dtype=np.float32)
-                   if name not in ['dlv-rate-hc1', 'dlv-rate-hc2', 'disruption']
-                   else spaces.Box(shape=(1,), low=0, high=1, dtype=np.float32))
+        # self.observation_space = spaces.Dict({
+        #     name: (spaces.Box(shape=(1,), low=0, high=np.inf, dtype=np.float32)
+        #            if name not in ['dlv-rate-hc1', 'dlv-rate-hc2', 'disruption']
+        #            else spaces.Box(shape=(1,), low=0, high=1, dtype=np.float32))
+        #     for name in self.observation_keys
+        # })
+        self.observation_space = spaces.Dict(OrderedDict([
+            (name, spaces.Box(shape=(1,), low=0, high=np.inf, dtype=np.float32)
+                if name not in ['dlv-rate-hc1', 'dlv-rate-hc2', 'disruption']
+                else spaces.Box(shape=(1,), low=0, high=1, dtype=np.float32))
             for name in self.observation_keys
-        })
+            ]))
         self.seed()
         self.reset()
 
@@ -136,9 +143,6 @@ class CrispEnv2(gym.Env):
 
     def _get_obs(self, now):
 
-        # ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
-         # 'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
-
         inventory = self.agent.inventory_level()
         history_item = self.agent.get_history_item(now)
         demand = self.agent.demand(now)
@@ -159,11 +163,73 @@ class CrispEnv2(gym.Env):
             end_inventory = 0
             end_backlog = backlog - inventory
 
-        suggestion = max(outl + backlog - on_order - end_inventory, 0)
+        suggestion = max(outl + end_backlog - on_order - end_inventory, 0)
 
         self.backlog = end_backlog
 
-        return np.array([inventory, shipment, demand, backlog])
+        demand_hc1_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
+                               (self.data['agent'] == 'ds_2') &
+                               (self.data['item'] == 'demand_hc1')].value.sum()
+        delivered_to_hc1_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
+                                     (self.data['agent'] == 'ds_2') &
+                                     (self.data['item'] == 'delivered-to-hc1')].value.sum()
+        deliv_rate_to_hc1 = min(round(delivered_to_hc1_c / demand_hc1_c, 2), 1)
+
+        demand_hc2_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
+                               (self.data['agent'] == 'ds_2') &
+                               (self.data['item'] == 'demand_hc2')].value.sum()
+        delivered_to_hc2_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
+                                     (self.data['agent'] == 'ds_2') &
+                                     (self.data['item'] == 'delivered-to-hc2')].value.sum()
+        deliv_rate_to_hc2 = min(round(delivered_to_hc2_c / demand_hc2_c, 2), 1)
+
+        if self.simulation.disruptions and self.simulation.disruptions[0].happen_day_1 == self.simulation.now:
+            disruption = 1
+        else:
+            disruption = 0
+
+        return_obs = OrderedDict([
+            ('inventory', [inventory]),
+            ('demand-hc1', [demand_hc1]),
+            ('demand-hc2', [demand_hc2]),
+            ('on-order', [on_order]),
+            ('shipment', [shipment]),
+            ('suggestion', [suggestion]),
+            ('outl', [outl]),
+            ('dlv-rate-hc1', [deliv_rate_to_hc1]),
+            ('dlv-rate-hc2', [deliv_rate_to_hc2]),
+            ('mn-inventory', [mn_inventory]),
+            ('disruption', [disruption])
+        ])
+        # return_obs = OrderedDict()
+        # return_obs['inventory'] = [inventory]
+        # return_obs['demand-hc1'] = [demand_hc1]
+        # return_obs['demand-hc2'] = [demand_hc2]
+        # return_obs['on-order'] = [on_order]
+        # return_obs['shipment'] = [shipment]
+        # return_obs['suggestion'] = [suggestion]
+        # return_obs['outl'] = [outl]
+        # return_obs['dlv-rate-hc1'] = [deliv_rate_to_hc1]
+        # return_obs['dlv-rate-hc2'] = [deliv_rate_to_hc2]
+        # return_obs['mn-inventory'] = [mn_inventory]
+        # return_obs['disruption'] = [disruption]
+
+        # return_obs = {
+        #     'inventory': inventory,
+        #     'demand-hc1': demand_hc1,
+        #     'demand-hc2': demand_hc2,
+        #     'on-order': on_order,
+        #     'shipment': shipment,
+        #     'suggestion': suggestion,
+        #     'outl': outl,
+        #     'dlv-rate-hc1': deliv_rate_to_hc1,
+        #     'dlv-rate-hc2': deliv_rate_to_hc2,
+        #     'mn-inventory': mn_inventory,
+        #     'disruption': disruption
+        # }
+
+        # return np.array([inventory, shipment, demand, backlog])
+        return return_obs
 
     def _get_agent_by_role(self, role):
         #   IMPORTANT:  This part probably needs to be edited. Right now this function only returns the first agent in
@@ -187,7 +253,21 @@ class CrispEnv2(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    def _rescale_action(self, action):
+        rescaled_actions = np.zeros((2,), dtype=np.int64)
+
+        bin_1 = np.arange(-1, 1, 2/self.allocation_n, dtype=np.float32)
+        bin_2 = np.arange(-1, 1, 2/self.max_order, dtype=np.float32)
+
+        rescaled_actions[0] = np.digitize(action[0], bin_1[1:])
+        rescaled_actions[1] = np.digitize(action[1], bin_2[1:])
+
+        return rescaled_actions
+
     def _take_action(self, action):
+
+        if isinstance(action[0], np.float32) or isinstance(action[1], np.float32):
+            action = self._rescale_action(action)
 
         inventory = self.agent.inventory_level()
         backlog = sum(order.amount for order in self.agent.backlog)
@@ -203,7 +283,7 @@ class CrispEnv2(gym.Env):
             alloc_hc1 = backlog_hc1
             alloc_hc2 = backlog_hc2
         else:
-            if action[0] == 0:
+            if int(action[0]) == 0:
                 if inventory >= backlog_hc1:
                     alloc_hc1 = backlog_hc1
                     inventory -= backlog_hc1
@@ -211,7 +291,7 @@ class CrispEnv2(gym.Env):
                 else:
                     alloc_hc1 = inventory
                     alloc_hc2 = 0
-            elif action[0] == 1:
+            elif int(action[0]) == 1:
                 if inventory >= backlog_hc2:
                     alloc_hc2 = backlog_hc2
                     inventory -= backlog_hc2
@@ -219,7 +299,7 @@ class CrispEnv2(gym.Env):
                 else:
                     alloc_hc2 = inventory
                     alloc_hc1 = 0
-            elif action[0] == 2:
+            elif int(action[0]) == 2:
                 alloc_hc1 = int(round(inventory * backlog_hc1 / backlog, 0))
                 alloc_hc2 = int(round(inventory * backlog_hc2 / backlog, 0))
 
