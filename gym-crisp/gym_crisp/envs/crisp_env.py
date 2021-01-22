@@ -301,7 +301,8 @@ class CrispEnv2(gym.Env):
                     alloc_hc1 = 0
             elif int(action[0]) == 2:
                 alloc_hc1 = int(round(inventory * backlog_hc1 / backlog, 0))
-                alloc_hc2 = int(round(inventory * backlog_hc2 / backlog, 0))
+                # alloc_hc2 = int(round(inventory * backlog_hc2 / backlog, 0))
+                alloc_hc2 = inventory - alloc_hc1
 
         self.decisions = [
             {

@@ -19,24 +19,24 @@ config.episode_end = 55
 config.n_step = 36
 
 config.greedy = False
-config.gpu = True
+config.gpu = False
 config.sess_nan_test = False
-# config.mode = 'train'
-config.mode = 'test'
+config.mode = 'train'
+# config.mode = 'test'
 
 config.activation = tf.nn.elu
 config.normalize_adv = True
 config.scale_action = False
 
-config.itr = 2      # 500
+config.itr = 500      # 500
 config.test_itr = 32    # 32
 # config.max_traj_len = 128
 config.max_traj_len = 35
 config.update_period = 5
 config.inner_itr_1 = 2
 config.inner_itr_2 = 5
-config.print_itr = 1    # 5
-config.save_itr = 1     # 10
+config.print_itr = 5    # 5
+config.save_itr = 10     # 10
 config.batch_size_traj = config.n_cpu = 8
 if config.mode == 'render':
     config.batch_size_traj = config.n_cpu = 1
