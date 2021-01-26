@@ -11,6 +11,15 @@ from gym.wrappers.filter_observation import FilterObservation
 from gym.wrappers import FlattenObservation
 # from stable_baselines import PPO2, PPO, GAIL
 from stable_baselines.common.env_checker import check_env
+import sys
+import cProfile as profile
+
+crispPath = os.path.join(os.path.abspath('../'), 'crisp/')
+crisp_server_Path = os.path.join(os.path.abspath('../'), 'crisp_game_server/')
+sys.path.insert(1, crispPath)
+sys.path.insert(1, crisp_server_Path)
+
+global pr
 
 
 def callback(locals_, globals_):
@@ -26,6 +35,10 @@ def callback(locals_, globals_):
 
 
 if __name__ == '__main__':
+
+    pr = profile.Profile()
+
+    pr.disable()
 
     # Create and wrap the environment
     # env = gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60)
@@ -43,7 +56,9 @@ if __name__ == '__main__':
     for _ in range(n_steps):
         # Random action
         action = env.action_space.sample()
+        pr.enable()
         obs, reward, done, info = env.step(action)
+        pr.disable()
         reward_sum += reward
         action_list.append(action)
         # print('Reward is: ', reward)
@@ -56,3 +71,4 @@ if __name__ == '__main__':
 
     print('Average reward is: ', int(np.mean(reward_list)))
     print('SD of reward is: ', int(np.std(reward_list)))
+    pr.dump_stats('profile2.pstat')

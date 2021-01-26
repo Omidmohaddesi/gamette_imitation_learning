@@ -22,8 +22,14 @@ class CrispEnv2(gym.Env):
         self.np_random = None
         self.study_name = study_name
         self.start_cycle = start_cycle
-        self.data_columns = ['time', 'agent', 'item', 'value', 'unit']
-        self.data = pd.DataFrame(columns=self.data_columns)
+        # self.data_columns = ['time', 'agent', 'item', 'value', 'unit']
+        # self.data = pd.DataFrame(columns=self.data_columns)
+        self.data = {
+            'demand_hc1': [],
+            'demand_hc2': [],
+            'delivered-to-hc1': [],
+            'delivered-to-hc2': []
+        }
         self.simulation = None
         self.runner = None
         self.state = None
@@ -60,7 +66,7 @@ class CrispEnv2(gym.Env):
             for name in self.observation_keys
             ]))
         self.seed()
-        self.reset()
+        # self.reset()
 
     def step(self, action):
 
@@ -98,8 +104,8 @@ class CrispEnv2(gym.Env):
         self.simulation, self.runner = simulation_builder.build_simulation_study_2(self.study_name)
         self.runner._update_patient(0)
         self.runner._update_agents(0)
-        self._fast_forward_simulation()
         self.agent = self._get_agent_by_role(self.role)
+        self._fast_forward_simulation()
 
         self.simulation.now += 1
         self.runner._update_patient(self.simulation.now)
@@ -167,20 +173,12 @@ class CrispEnv2(gym.Env):
 
         self.backlog = end_backlog
 
-        demand_hc1_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
-                               (self.data['agent'] == 'ds_2') &
-                               (self.data['item'] == 'demand_hc1')].value.sum()
-        delivered_to_hc1_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
-                                     (self.data['agent'] == 'ds_2') &
-                                     (self.data['item'] == 'delivered-to-hc1')].value.sum()
-        deliv_rate_to_hc1 = min(round(delivered_to_hc1_c / demand_hc1_c, 2), 1)
+        demand_hc1_c = sum(self.data.get('demand_hc1'))
+        delivered_to_hc1_c = sum(self.data.get('delivered-to-hc1'))
+        demand_hc2_c = sum(self.data.get('demand_hc2'))
+        delivered_to_hc2_c = sum(self.data.get('delivered-to-hc2'))
 
-        demand_hc2_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
-                               (self.data['agent'] == 'ds_2') &
-                               (self.data['item'] == 'demand_hc2')].value.sum()
-        delivered_to_hc2_c = self.data[(self.data['time'] >= self.simulation.now - 9) &
-                                     (self.data['agent'] == 'ds_2') &
-                                     (self.data['item'] == 'delivered-to-hc2')].value.sum()
+        deliv_rate_to_hc1 = min(round(delivered_to_hc1_c / demand_hc1_c, 2), 1)
         deliv_rate_to_hc2 = min(round(delivered_to_hc2_c / demand_hc2_c, 2), 1)
 
         if self.simulation.disruptions and self.simulation.disruptions[0].happen_day_1 == self.simulation.now:
@@ -420,23 +418,29 @@ class CrispEnv2(gym.Env):
             # if i > 61:
             #     self.agent = self._get_agent_by_role(self.role)
             #     reward += self._reward()
-            self._collect_data()
+            if i >= self.start_cycle - 9:
+                self._collect_data()
 
     def _collect_data(self):
 
-        for agent in self.simulation.agents:
-            self.data = self.data.append(
-                pd.DataFrame(agent.collect_data(self.simulation.now), columns=self.data_columns), ignore_index=True)
-            if agent.agent_name == 'DS1':
-                name = agent.name()
-                history = agent.get_history_item(self.simulation.now)
-                self.data = self.data.append(pd.DataFrame([
-                    [self.simulation.now, name, 'demand_hc1',
-                     sum(in_order.amount for in_order in history['incoming_order']
-                         if in_order.src.agent_name == 'HC1'), ''],
-                    [self.simulation.now, name, 'demand_hc2',
-                     sum(in_order.amount for in_order in history['incoming_order']
-                         if in_order.src.agent_name == 'HC2'), ''],
-                    [self.simulation.now, name, 'order', sum(order.amount for order in history['order']), '']
+        now = self.simulation.now
+        history = self.agent.get_history_item(now)
 
-                ], columns=self.data_columns), ignore_index=True)
+        for key, my_array in self.data.items():
+            if key == 'demand_hc1':
+                self.data.get(key).append(sum(in_order.amount for in_order in history['incoming_order']
+                                              if in_order.src.agent_name == 'HC1'))
+            elif key == 'demand_hc2':
+                self.data.get(key).append(sum(in_order.amount for in_order in history['incoming_order']
+                                              if in_order.src.agent_name == 'HC2'))
+            elif key == 'delivered-to-hc1':
+                self.data.get(key).append(sum([allocation['item'].amount for allocation in history['allocate']
+                                               if allocation['order'].src.agent_name == 'HC1']))
+            elif key == 'delivered-to-hc2':
+                self.data.get(key).append(sum([allocation['item'].amount for allocation in history['allocate']
+                                               if allocation['order'].src.agent_name == 'HC2']))
+            else:
+                raise KeyError(f'No stat collection is defined for key {key}')
+
+            if len(my_array) > 9:
+                del self.data.get(key)[0]

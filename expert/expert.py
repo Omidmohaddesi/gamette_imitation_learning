@@ -8,12 +8,18 @@ from stable_baselines import PPO2
 import os
 from tqdm import tqdm
 import pdb
-
+import sys
 from config import config
 
 import gym_crisp
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+
+
+crispPath = os.path.join(os.path.abspath('../..'), 'crisp/')
+crisp_server_Path = os.path.join(os.path.abspath('../..'), 'crisp_game_server/')
+sys.path.insert(1, crispPath)
+sys.path.insert(1, crisp_server_Path)
 
 
 def scale_orders(my_df):

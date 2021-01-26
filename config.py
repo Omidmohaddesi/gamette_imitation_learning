@@ -19,7 +19,7 @@ config.episode_end = 55
 config.n_step = 36
 
 config.greedy = False
-config.gpu = False
+config.gpu = True
 config.sess_nan_test = False
 config.mode = 'train'
 # config.mode = 'test'
