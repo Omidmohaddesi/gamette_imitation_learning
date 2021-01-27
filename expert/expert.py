@@ -4,6 +4,7 @@ import tensorflow as tf
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import SubprocVecEnv, DummyVecEnv
 from gym.wrappers.filter_observation import FilterObservation
+from gym.wrappers import FlattenObservation
 from stable_baselines import PPO2
 import os
 from tqdm import tqdm
@@ -35,9 +36,13 @@ def scale_orders(my_df):
 def convert_actions(my_df):
 
     new_df = my_df.copy()
+    # new_df.loc[:, range(21, 56)] = pd.DataFrame(
+    #     np.where(new_df[range(21, 56)] == 'Prefer HC1', -1.,
+    #              np.where(new_df[range(21, 56)] == 'Prefer HC2', 0., 1.)),
+    #     columns=range(21, 56))
     new_df.loc[:, range(21, 56)] = pd.DataFrame(
-        np.where(new_df[range(21, 56)] == 'Prefer HC1', -1.,
-                 np.where(new_df[range(21, 56)] == 'Prefer HC2', 0., 1.)),
+        np.where(new_df[range(21, 56)] == 'Prefer HC1', 0,
+                 np.where(new_df[range(21, 56)] == 'Prefer HC2', 1, 2)),
         columns=range(21, 56))
 
     return new_df.astype(np.float32)
@@ -62,22 +67,24 @@ def main():
 
     allocation_data = convert_actions(allocation_data)
 
-    scaled_order_data = scale_orders(order_data)
+    # scaled_order_data = scale_orders(order_data)
 
     if config.n_cpu == 1:
-        env = FilterObservation(gym.make(config.env_name,
-                                         study_name=config.study_name,
-                                         start_cycle=config.start_cycle),
-                                filter_keys=config.obs_filter_keys)
+        env = FlattenObservation(
+            FilterObservation(gym.make(config.env_name,
+                                       study_name=config.study_name,
+                                       start_cycle=config.start_cycle),
+                              filter_keys=config.obs_filter_keys))
         # env = DummyVecEnv([lambda: FilterObservation(gym.make(config.env_name,
         #                                                       study_name=config.study_name,
         #                                                       start_cycle=config.start_cycle),
         #                                              filter_keys=config.obs_filter_keys)])
     else:
-        env = SubprocVecEnv([lambda: FilterObservation(gym.make(config.env_name,
-                                                                study_name=config.study_name,
-                                                                start_cycle=config.start_cycle),
-                                                       filter_keys=config.obs_filter_keys)
+        env = SubprocVecEnv([lambda: FlattenObservation(
+            FilterObservation(gym.make(config.env_name,
+                                       study_name=config.study_name,
+                                       start_cycle=config.start_cycle),
+                              filter_keys=config.obs_filter_keys))
                              for _ in range(config.n_cpu)])
 
     trajs_state = []
@@ -87,7 +94,8 @@ def main():
     traj_state_np = np.array([])
     traj_action_np = np.array([])
 
-    for orders, allocations in tqdm(zip(scaled_order_data.iterrows(), allocation_data.iterrows())):
+    # for orders, allocations in tqdm(zip(scaled_order_data.iterrows(), allocation_data.iterrows())):
+    for orders, allocations in tqdm(zip(order_data.iterrows(), allocation_data.iterrows())):
 
         # prestop = False
         traj_states = []
@@ -121,7 +129,7 @@ def main():
         #     trajs_action.append(traj_actions)
         #     trajs_reward.append(np.sum(traj_rewards))
 
-        print(np.mean(trajs_reward))
+        print(trajs_reward[-1])
 
         traj_state_np = np.array(trajs_state)
         traj_action_np = np.array(trajs_action)

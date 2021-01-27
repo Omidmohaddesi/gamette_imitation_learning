@@ -42,7 +42,7 @@ class CrispEnv2(gym.Env):
         self.total_reward = 0
         self.allocation_n = 3
         self.min_order = 0
-        self.max_order = 400
+        self.max_order = 391
         self.observation_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
                                  'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
         # self.action_space = spaces.Box(
