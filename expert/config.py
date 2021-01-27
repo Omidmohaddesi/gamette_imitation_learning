@@ -10,7 +10,8 @@ config.env_name = 'Crisp-v2'
 config.condition = 2
 config.study_name = 'study_2_2'
 config.start_cycle = 60
-config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl']
+config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl',
+                          'disruption', 'mn-inventory']
 config.episodes = 35
 config.episode_start = 21
 config.episode_end = 55
