@@ -15,6 +15,7 @@ from config import config
 import gym_crisp
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+import joblib
 
 
 crispPath = os.path.join(os.path.abspath('../..'), 'crisp/')
@@ -36,14 +37,14 @@ def scale_orders(my_df):
 def convert_actions(my_df):
 
     new_df = my_df.copy()
-    # new_df.loc[:, range(21, 56)] = pd.DataFrame(
-    #     np.where(new_df[range(21, 56)] == 'Prefer HC1', -1.,
-    #              np.where(new_df[range(21, 56)] == 'Prefer HC2', 0., 1.)),
-    #     columns=range(21, 56))
     new_df.loc[:, range(21, 56)] = pd.DataFrame(
-        np.where(new_df[range(21, 56)] == 'Prefer HC1', 0,
-                 np.where(new_df[range(21, 56)] == 'Prefer HC2', 1, 2)),
+        np.where(new_df[range(21, 56)] == 'Prefer HC1', -1.,
+                 np.where(new_df[range(21, 56)] == 'Prefer HC2', 0., 1.)),
         columns=range(21, 56))
+    # new_df.loc[:, range(21, 56)] = pd.DataFrame(
+    #     np.where(new_df[range(21, 56)] == 'Prefer HC1', 0,
+    #              np.where(new_df[range(21, 56)] == 'Prefer HC2', 1, 2)),
+    #     columns=range(21, 56))
 
     return new_df.astype(np.float32)
 
@@ -63,17 +64,24 @@ def main():
         ['player_id', 'condition'], axis=1)
 
     order_data.columns = order_data.columns.astype(int)
-    allocation_data.columns = allocation_data.columns.astype(int)
+    order_data_melt = order_data.melt(ignore_index=False)
+    order_data_melt['value'] = order_data_melt['value'].astype(int)
 
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    order_data_melt[['value']] = scaler.fit_transform(order_data_melt[['value']])
+
+    allocation_data.columns = allocation_data.columns.astype(int)
     allocation_data = convert_actions(allocation_data)
 
-    # scaled_order_data = scale_orders(order_data)
+    scaled_order_data = order_data_melt.pivot_table(
+        values='value', index=order_data_melt.index, columns='variable')
 
     if config.n_cpu == 1:
         env = FlattenObservation(
             FilterObservation(gym.make(config.env_name,
                                        study_name=config.study_name,
-                                       start_cycle=config.start_cycle),
+                                       start_cycle=config.start_cycle,
+                                       scaler=scaler),
                               filter_keys=config.obs_filter_keys))
         # env = DummyVecEnv([lambda: FilterObservation(gym.make(config.env_name,
         #                                                       study_name=config.study_name,
@@ -83,7 +91,8 @@ def main():
         env = SubprocVecEnv([lambda: FlattenObservation(
             FilterObservation(gym.make(config.env_name,
                                        study_name=config.study_name,
-                                       start_cycle=config.start_cycle),
+                                       start_cycle=config.start_cycle,
+                                       scaler=scaler),
                               filter_keys=config.obs_filter_keys))
                              for _ in range(config.n_cpu)])
 
@@ -94,8 +103,8 @@ def main():
     traj_state_np = np.array([])
     traj_action_np = np.array([])
 
-    # for orders, allocations in tqdm(zip(scaled_order_data.iterrows(), allocation_data.iterrows())):
-    for orders, allocations in tqdm(zip(order_data.iterrows(), allocation_data.iterrows())):
+    for orders, allocations in tqdm(zip(scaled_order_data.iterrows(), allocation_data.iterrows())):
+    # for orders, allocations in tqdm(zip(order_data.iterrows(), allocation_data.iterrows())):
 
         # prestop = False
         traj_states = []
@@ -136,6 +145,7 @@ def main():
 
     np.save('traj/{}_{}_state'.format(config.env_name, config.condition), traj_state_np)
     np.save('traj/{}_{}_action'.format(config.env_name, config.condition), traj_action_np)
+    joblib.dump(scaler, 'traj/{}_{}_scaler.joblib'.format(config.env_name, config.condition))
     print(traj_state_np.shape)
     print(traj_action_np.shape)
     print()

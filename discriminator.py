@@ -45,8 +45,9 @@ class Discriminator:
         loss, expert_score, stu_score, _ = self.sess.run(
             [self.loss, self.mean_expert_score, self.mean_stu_score, self.train_op], 
             feed_dict={
-                self.expert_state: np.stack([[np.array(list(d.values())).T for d in traj]
-                                             for traj in expert_state], axis=0),
+                # self.expert_state: np.stack([[np.array(list(d.values())).T for d in traj]
+                #                              for traj in expert_state], axis=0),
+                self.expert_state: expert_state,
                 self.expert_action: expert_action,
                 self.stu_state: stu_state,
                 self.stu_action: stu_action

@@ -22,6 +22,8 @@ from buffer import Buffer
 import utils as U
 from pdb import set_trace as db
 import gym_crisp
+import joblib
+
 
 crispPath = os.path.join(os.path.abspath('../'), 'crisp/')
 crisp_server_Path = os.path.join(os.path.abspath('../'), 'crisp_game_server/')
@@ -37,13 +39,14 @@ np.set_printoptions(precision=4)
 # print(config)
 
 
-def get_env():
+def get_env(scaler):
     if config.n_cpu == 1:
         my_env = FlattenObservation(
             FilterObservation(
                 gym.make(config.env_name,
                          study_name=config.study_name,
-                         start_cycle=config.start_cycle),
+                         start_cycle=config.start_cycle,
+                         scaler=scaler),
                 filter_keys=config.obs_filter_keys))
         # my_env = DummyVecEnv([lambda: FilterObservation(gym.make(config.env_name,
         #                                                       study_name=config.study_name,
@@ -54,7 +57,8 @@ def get_env():
             FilterObservation(
                 gym.make(config.env_name,
                          study_name=config.study_name,
-                         start_cycle=config.start_cycle),
+                         start_cycle=config.start_cycle,
+                         scaler=scaler),
                 filter_keys=config.obs_filter_keys))
                                 for _ in range(config.n_cpu)])
     return my_env
@@ -64,13 +68,14 @@ def load_expert_traj():
 
     traj_np = np.load('expert/traj/{}_{}_state.npy'.format(config.env_name, config.condition), allow_pickle=True)
     theta_np = np.load('expert/traj/{}_{}_action.npy'.format(config.env_name, config.condition), allow_pickle=True)
+    scaler = joblib.load('expert/traj/{}_{}_scaler.joblib'.format(config.env_name, config.condition))
 
     print()
     print('expert trajectories shape: ', traj_np.shape)
     print('expert thetas shape: ', theta_np.shape)
     print()
     
-    return traj_np, theta_np
+    return traj_np, theta_np, scaler
 
 
 def code_reward_helper(stu_traj_code, r, code_1, code_2, code_3):
@@ -158,12 +163,12 @@ def gae(stu_traj_state, stu_traj_action, stu_traj_code):
 
 
 def main():
-    traj_np, theta_np = load_expert_traj()
+    traj_np, theta_np, scaler = load_expert_traj()
 
     global env, sess, policy, old_policy, value_net, old_value_net, \
         posterior, discriminator, buffer, saver, ckpt_name
 
-    env = get_env()
+    env = get_env(scaler)
     sess = U.get_tf_session()
     policy = Policy(config, sess, 'stu')
     old_policy = Policy(config, sess, 'old')

@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 class CrispEnv2(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, n=35, role='ds', study_name='study_2_1', start_cycle=60):
+    def __init__(self, n=35, role='ds', study_name='study_2_1', start_cycle=60, scaler=None):
         self.n = n  # number of simulation periods in each episode
         self.np_random = None
         self.study_name = study_name
         self.start_cycle = start_cycle
+        self.order_action_scaler = scaler
         # self.data_columns = ['time', 'agent', 'item', 'value', 'unit']
         # self.data = pd.DataFrame(columns=self.data_columns)
         self.data = {
@@ -42,7 +43,7 @@ class CrispEnv2(gym.Env):
         self.total_reward = 0
         self.allocation_n = 3
         self.min_order = 0
-        self.max_order = 391
+        self.max_order = 400
         self.observation_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
                                  'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
         # self.action_space = spaces.Box(
@@ -178,8 +179,8 @@ class CrispEnv2(gym.Env):
         demand_hc2_c = sum(self.data.get('demand_hc2'))
         delivered_to_hc2_c = sum(self.data.get('delivered-to-hc2'))
 
-        deliv_rate_to_hc1 = min(round(delivered_to_hc1_c / demand_hc1_c, 2), 1)
-        deliv_rate_to_hc2 = min(round(delivered_to_hc2_c / demand_hc2_c, 2), 1)
+        deliv_rate_to_hc1 = min(round(delivered_to_hc1_c / demand_hc1_c if demand_hc1_c else 0, 2), 1)
+        deliv_rate_to_hc2 = min(round(delivered_to_hc1_c / demand_hc1_c if demand_hc1_c else 0, 2), 1)
 
         if self.simulation.disruptions and self.simulation.disruptions[0].happen_day_1 == self.simulation.now:
             disruption = 1
@@ -255,16 +256,17 @@ class CrispEnv2(gym.Env):
         rescaled_actions = np.zeros((2,), dtype=np.int64)
 
         bin_1 = np.arange(-1, 1, 2/self.allocation_n, dtype=np.float32)
-        bin_2 = np.arange(-1, 1, 2/self.max_order, dtype=np.float32)
+        # bin_2 = np.arange(-1, 1, 2/self.max_order, dtype=np.float32)
 
         rescaled_actions[0] = np.digitize(action[0], bin_1[1:])
-        rescaled_actions[1] = np.digitize(action[1], bin_2[1:])
+        # rescaled_actions[1] = np.digitize(action[1], bin_2[1:])
+        rescaled_actions[1] = self.order_action_scaler.inverse_transform([[action[1]]])[0][0]
 
         return rescaled_actions
 
     def _take_action(self, action):
 
-        if isinstance(action[0], np.float32) or isinstance(action[1], np.float32):
+        if isinstance(action[0], np.floating) or isinstance(action[1], np.floating):
             action = self._rescale_action(action)
 
         inventory = self.agent.inventory_level()

@@ -9,8 +9,8 @@ config = edict()
 
 config.env_name = 'Crisp-v2'
 
-config.condition = 3
-config.study_name = 'study_2_3'
+config.condition = 2
+config.study_name = 'study_2_2'
 config.start_cycle = 60
 config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl']
 config.episodes = 35
@@ -37,7 +37,7 @@ config.inner_itr_1 = 2
 config.inner_itr_2 = 5
 config.print_itr = 5    # 5
 config.save_itr = 10     # 10
-config.batch_size_traj = config.n_cpu = 8
+config.batch_size_traj = config.n_cpu = 11
 if config.mode == 'render':
     config.batch_size_traj = config.n_cpu = 1
 
