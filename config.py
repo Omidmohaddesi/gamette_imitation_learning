@@ -12,8 +12,7 @@ config.env_name = 'Crisp-v2'
 config.condition = 2
 config.study_name = 'study_2_2'
 config.start_cycle = 60
-config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl',
-                          'disruption', 'mn-inventory']
+config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl']
 config.episodes = 35
 config.episode_start = 21
 config.episode_end = 55
@@ -22,8 +21,8 @@ config.n_step = 36
 config.greedy = False
 config.gpu = True
 config.sess_nan_test = False
-# config.mode = 'train'
-config.mode = 'test'
+config.mode = 'train'
+# config.mode = 'test'
 
 config.activation = tf.nn.elu
 config.normalize_adv = True
@@ -38,7 +37,7 @@ config.inner_itr_1 = 2
 config.inner_itr_2 = 5
 config.print_itr = 5    # 5
 config.save_itr = 10     # 10
-config.batch_size_traj = config.n_cpu = 11
+config.batch_size_traj = config.n_cpu = 8
 if config.mode == 'render':
     config.batch_size_traj = config.n_cpu = 1
 

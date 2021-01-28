@@ -46,28 +46,17 @@ class CrispEnv2(gym.Env):
         self.max_order = 400
         self.observation_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
                                  'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
-        # self.action_space = spaces.Box(
-        #     low=self.min_order, high=self.max_order, shape=(1,), dtype=np.float32)
-        # self.action_space = spaces.Discrete(1000)
-        # self.action_space = spaces.Tuple([spaces.Discrete(3), spaces.Discrete(self.max_order)])
-        self.action_space = spaces.MultiDiscrete([self.allocation_n, self.max_order])
-        # self.observation_space = spaces.Box(
-        #     low=np.array([0, 0, 0, 0]), high=np.array([self.max_order, self.max_order, self.max_order, self.max_order]),
-        #     dtype=np.float32)
-        # self.observation_space = spaces.Dict({
-        #     name: (spaces.Box(shape=(1,), low=0, high=np.inf, dtype=np.float32)
-        #            if name not in ['dlv-rate-hc1', 'dlv-rate-hc2', 'disruption']
-        #            else spaces.Box(shape=(1,), low=0, high=1, dtype=np.float32))
-        #     for name in self.observation_keys
-        # })
+
+        # self.action_space = spaces.MultiDiscrete([self.allocation_n, self.max_order])
+        self.action_space = spaces.Box(low=-1, high=1, shape=(2, ), dtype=np.float32)
+
         self.observation_space = spaces.Dict(OrderedDict([
-            (name, spaces.Box(shape=(1,), low=0, high=np.inf, dtype=np.float32)
+            (name, spaces.Box(shape=(1,), low=0, high=10000, dtype=np.float32)
                 if name not in ['dlv-rate-hc1', 'dlv-rate-hc2', 'disruption']
                 else spaces.Box(shape=(1,), low=0, high=1, dtype=np.float32))
             for name in self.observation_keys
             ]))
         self.seed()
-        # self.reset()
 
     def step(self, action):
 
@@ -256,11 +245,13 @@ class CrispEnv2(gym.Env):
         rescaled_actions = np.zeros((2,), dtype=np.int64)
 
         bin_1 = np.arange(-1, 1, 2/self.allocation_n, dtype=np.float32)
-        # bin_2 = np.arange(-1, 1, 2/self.max_order, dtype=np.float32)
-
         rescaled_actions[0] = np.digitize(action[0], bin_1[1:])
-        # rescaled_actions[1] = np.digitize(action[1], bin_2[1:])
-        rescaled_actions[1] = self.order_action_scaler.inverse_transform([[action[1]]])[0][0]
+
+        if self.order_action_scaler:
+            rescaled_actions[1] = self.order_action_scaler.inverse_transform([[action[1]]])[0][0]
+        else:
+            bin_2 = np.arange(-1, 1, 2 / self.max_order, dtype=np.float32)
+            rescaled_actions[1] = np.digitize(action[1], bin_2[1:])
 
         return rescaled_actions
 
