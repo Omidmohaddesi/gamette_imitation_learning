@@ -122,3 +122,6 @@ expert/traj/
 plots/
 render/
 
+# Statistisc and other
+*.pstat
+.idea/
