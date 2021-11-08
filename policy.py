@@ -80,6 +80,9 @@ class Policy:
         return bc_loss
 
     def sample_action(self, state_2d, code, in_h_state):
+        if state_2d.ndim == 1:
+            state_2d = state_2d[np.newaxis, :]
+
         fd = {
             self.state: state_2d[:, np.newaxis, :],
             self.code: code,

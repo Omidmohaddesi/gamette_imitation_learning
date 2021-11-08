@@ -40,10 +40,11 @@ class CrispEnv2(gym.Env):
         self.backlog = 0
         self.reward = 0
         self.order = 0
+        self.allocation = None
         self.total_reward = 0
         self.allocation_n = 3
         self.min_order = 0
-        self.max_order = 400
+        self.max_order = 130
         self.observation_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment',
                                  'suggestion', 'outl', 'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory', 'disruption']
 
@@ -85,7 +86,9 @@ class CrispEnv2(gym.Env):
 
         new_obs = self._get_obs(self.simulation.now)
 
-        return new_obs, self.reward, done, {'time': self.simulation.now}
+        return new_obs, self.reward, done, {'time': self.simulation.now,
+                                            'allocation': self.allocation,
+                                            'order': self.order}
 
     def reset(self):
         self.total_reward = 0
@@ -113,11 +116,11 @@ class CrispEnv2(gym.Env):
         self.total_reward += self.reward
         print(f'Simulation Time: {self.simulation.now - 1}')
         # print(f'Inventory: {self.agent.inventory_level()}')
-        print(f'Inventory: {self.agent.history[self.simulation.now - 1]["inventory"]}')
-        print(f'Backlog: {self.backlog}')
-        # print(f'Order amount: {self.order}')
-        print(
-            f'Order amount: {[0 if not self.agent.history[self.simulation.now - 1]["order"] else self.agent.history[self.simulation.now - 1]["order"][0].amount]}')
+        # print(f'Inventory: {self.agent.history[self.simulation.now - 1]["inventory"]}')
+        # print(f'Backlog: {self.backlog}')
+        print(f'Order amount: {self.order}')
+        # print(
+        #     f'Order amount: {[0 if not self.agent.history[self.simulation.now - 1]["order"] else self.agent.history[self.simulation.now - 1]["order"][0].amount]}')
         print(f'Reward: {self.reward}')
         print(f'total reward: {self.total_reward}')
         print('--------------------')
@@ -143,9 +146,9 @@ class CrispEnv2(gym.Env):
         history_item = self.agent.get_history_item(now)
         demand = self.agent.demand(now)
         demand_hc1 = sum(in_order.amount for in_order in history_item['incoming_order']
-                         if in_order.src.agent_name == 'HC1')
+                         if in_order.src == 'hc_4')
         demand_hc2 = sum(in_order.amount for in_order in history_item['incoming_order']
-                         if in_order.src.agent_name == 'HC2')
+                         if in_order.src == 'hc_5')
         on_order = sum(order.amount for order in self.agent.on_order)
         shipment = sum(d['item'].amount for d in history_item['delivery'])
         backlog = sum(order.amount for order in self.agent.backlog)
@@ -264,9 +267,9 @@ class CrispEnv2(gym.Env):
         backlog = sum(order.amount for order in self.agent.backlog)
 
         backlog_hc1 = sum(order.amount for order in self.agent.backlog
-                          if order.src == self.simulation.health_centers[0])
+                          if order.src == self.simulation.health_centers[0].name())
         backlog_hc2 = sum(order.amount for order in self.agent.backlog
-                          if order.src == self.simulation.health_centers[1])
+                          if order.src == self.simulation.health_centers[1].name())
 
         alloc_hc1, alloc_hc2 = 0, 0
 
@@ -316,6 +319,7 @@ class CrispEnv2(gym.Env):
 
         # self.decisions.append(decision)
         self.order = action[1]
+        self.allocation = action[0]
 
     def _parse_decisions(self):
         """ convert the game decision to simulator desicion """
@@ -343,26 +347,30 @@ class CrispEnv2(gym.Env):
             decision = OrderDecision()
             decision.amount = agent_decision['decision_value']
             # decision.upstream = self.simulation.distributors[0]
-            decision.upstream = [k for k in self.simulation.distributors if k.agent_name == 'DS'][0]
+            # decision.upstream = [k for k in self.simulation.distributors if k.agent_name == 'DS'][0]
+            decision.upstream = [k for k in self.runner.simulation.distributors if k.agent_name == 'DS'][0].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'order_from_ds2':
             decision = OrderDecision()
             decision.amount = agent_decision['decision_value']
             # decision.upstream = self.simulation.distributors[1]
-            decision.upstream = [k for k in self.simulation.distributors if k.agent_name == 'DS'][1]
+            # decision.upstream = [k for k in self.simulation.distributors if k.agent_name == 'DS'][1]
+            decision.upstream = [k for k in self.simulation.distributors if k.agent_name == 'DS'][1].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'order_from_mn1':
             decision = OrderDecision()
             decision.amount = agent_decision['decision_value']
-            decision.upstream = self.simulation.manufacturers[0]
+            # decision.upstream = self.simulation.manufacturers[0]
+            decision.upstream = self.simulation.manufacturers[0].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'order_from_mn2':
             decision = OrderDecision()
             decision.amount = agent_decision['decision_value']
-            decision.upstream = self.simulation.manufacturers[1]
+            # decision.upstream = self.simulation.manufacturers[1]
+            decision.upstream = self.simulation.manufacturers[1].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'produce':
@@ -373,25 +381,29 @@ class CrispEnv2(gym.Env):
         elif agent_decision['decision_name'] == 'satisfy_ds1':
             decision = AllocateDecision()
             decision.amount = agent_decision['decision_value']
-            decision.downstream_node = self.simulation.distributors[0]
+            # decision.downstream_node = self.simulation.distributors[0]
+            decision.downstream_node = self.simulation.distributors[0].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'satisfy_ds2':
             decision = AllocateDecision()
             decision.amount = agent_decision['decision_value']
-            decision.downstream_node = self.simulation.distributors[1]
+            # decision.downstream_node = self.simulation.distributors[1]
+            decision.downstream_node = self.simulation.distributors[1].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'satisfy_hc1':
             decision = AllocateDecision()
             decision.amount = agent_decision['decision_value']
-            decision.downstream_node = self.simulation.health_centers[0]
+            # decision.downstream_node = self.simulation.health_centers[0]
+            decision.downstream_node = self.simulation.health_centers[0].name()
             agent_decision['agent'].decisions.append(decision)
 
         elif agent_decision['decision_name'] == 'satisfy_hc2':
             decision = AllocateDecision()
             decision.amount = agent_decision['decision_value']
-            decision.downstream_node = self.simulation.health_centers[1]
+            # decision.downstream_node = self.simulation.health_centers[1]
+            decision.downstream_node = self.simulation.health_centers[1].name()
             agent_decision['agent'].decisions.append(decision)
 
         else:
@@ -422,16 +434,16 @@ class CrispEnv2(gym.Env):
         for key, my_array in self.data.items():
             if key == 'demand_hc1':
                 self.data.get(key).append(sum(in_order.amount for in_order in history['incoming_order']
-                                              if in_order.src.agent_name == 'HC1'))
+                                              if in_order.src == 'hc_4'))
             elif key == 'demand_hc2':
                 self.data.get(key).append(sum(in_order.amount for in_order in history['incoming_order']
-                                              if in_order.src.agent_name == 'HC2'))
+                                              if in_order.src == 'hc_5'))
             elif key == 'delivered-to-hc1':
                 self.data.get(key).append(sum([allocation['item'].amount for allocation in history['allocate']
-                                               if allocation['order'].src.agent_name == 'HC1']))
+                                               if allocation['order'].src == 'hc_4']))
             elif key == 'delivered-to-hc2':
                 self.data.get(key).append(sum([allocation['item'].amount for allocation in history['allocate']
-                                               if allocation['order'].src.agent_name == 'HC2']))
+                                               if allocation['order'].src == 'hc_5']))
             else:
                 raise KeyError(f'No stat collection is defined for key {key}')
 

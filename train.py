@@ -283,34 +283,58 @@ def main():
     
     elif config.mode == 'render':
         # rollout trajectory
-        while True:
+
+        order_data = {}
+        allocation_data = {}
+        rewards_data = {}
+
+        for _ in tqdm(range(300)):
             stu_traj_code_np = np.random.randint(config.num_code, size=config.batch_size_traj)
-            forward_rewards = []
-            stand_rewards = []
-            backward_rewards = []
+            rewards = []
+            orders = []
+            allocations = []
 
             init_h_state = None
             init_state = env.reset()
             curr_h_state = init_h_state
-            curr_state = init_state[:, :config.state_dim]
+            curr_state = init_state[:config.state_dim]
 
             for _ in range(config.max_traj_len):
                 action_sampled, curr_h_state = policy.sample_action(curr_state, stu_traj_code_np, curr_h_state)
 
-                next_state, reward, done, info = env.step(action_sampled)
+                next_state, reward, done, info = env.step(action_sampled[0])
 
-                env.render()
-                curr_state = next_state[:, :config.state_dim]
+                # env.render()
+                curr_state = next_state[:config.state_dim]
 
-                forward_rewards.append(reward[0])
-                stand_rewards.append(info[0]['stand_reward'])
-                backward_rewards.append(info[0]['backward_reward'])
-            
-            print('code: ', stu_traj_code_np[0])
-            print('forward_r: ', np.sum(forward_rewards))
-            print('stand_r: ', np.sum(stand_rewards))
-            print('backward_r: ', np.sum(backward_rewards))
-            print()
+                rewards.append(reward)
+                orders.append(info.get('order', None))
+                allocations.append(info.get('allocation', None))
+
+            if stu_traj_code_np[0] not in order_data:
+                order_data.update({stu_traj_code_np[0]: np.array([orders])})
+                allocation_data.update({stu_traj_code_np[0]: np.array([allocations])})
+                rewards_data.update({stu_traj_code_np[0]: np.array([rewards])})
+            else:
+                order_data[stu_traj_code_np[0]] = np.append(
+                    order_data[stu_traj_code_np[0]], [orders], axis=0)
+                allocation_data[stu_traj_code_np[0]] = np.append(
+                    allocation_data[stu_traj_code_np[0]], [allocations], axis=0)
+                rewards_data[stu_traj_code_np[0]] = np.append(
+                    rewards_data[stu_traj_code_np[0]], [rewards], axis=0)
+
+            # print('code: ', stu_traj_code_np[0])
+            # print('reward: ', np.sum(rewards))
+            # print()
+
+        for code in order_data.keys():
+            np.savetxt(f'render/order_data_{config.condition}_code{code}.csv',
+                       order_data[code], delimiter=',')
+            np.savetxt(f'render/allocation_data_{config.condition}_code{code}.csv',
+                       allocation_data[code], delimiter=',')
+            np.savetxt(f'render/rewards_data_{config.condition}_code{code}.csv',
+                       rewards_data[code], delimiter=',')
+
 
     else:
         for i in tqdm(range(1, config.itr + 1)):

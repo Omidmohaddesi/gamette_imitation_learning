@@ -9,10 +9,11 @@ config = edict()
 
 config.env_name = 'Crisp-v2'
 
-config.condition = 2
-config.study_name = 'study_2_2'
+config.condition = 7
+config.study_name = 'study_2_{}'.format(config.condition)
 config.start_cycle = 60
-config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl']
+config.obs_filter_keys = ['inventory', 'demand-hc1', 'demand-hc2', 'on-order', 'shipment', 'suggestion', 'outl',
+                          'dlv-rate-hc1', 'dlv-rate-hc2', 'mn-inventory']
 config.episodes = 35
 config.episode_start = 21
 config.episode_end = 55
@@ -21,8 +22,9 @@ config.n_step = 36
 config.greedy = False
 config.gpu = True
 config.sess_nan_test = False
-config.mode = 'train'
+# config.mode = 'train'
 # config.mode = 'test'
+config.mode = 'render'
 
 config.activation = tf.nn.elu
 config.normalize_adv = True
@@ -42,7 +44,8 @@ if config.mode == 'render':
     config.batch_size_traj = config.n_cpu = 1
 
 config.save_path = os.path.join(dir_name, './ckpt/contion_{}.ckpt'.format(config.condition))
-config.load_path = os.path.join(dir_name, './ckpt/contion_{}.ckpt'.format(config.condition))
+config.load_path = os.path.join(dir_name, './ckpt/box_action_space/contion_{}.ckpt'.format(config.condition))
+# config.load_path = os.path.join(dir_name, './ckpt/contion_{}.ckpt'.format(config.condition))
 
 config.expert_traj_prefix = os.path.join(dir_name, 'expert', 'Hopper-v3')
 

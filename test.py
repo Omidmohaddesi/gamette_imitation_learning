@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     # Create and wrap the environment
     # env = gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60)
-    env = FlattenObservation(FilterObservation(gym.make('Crisp-v2', study_name='study_2_3', start_cycle=60),
+    env = FlattenObservation(FilterObservation(gym.make('Crisp-v2', study_name='study_2_4', start_cycle=60),
                                                filter_keys=['inventory', 'demand-hc1', 'demand-hc2', 'on-order',
                                                             'shipment', 'suggestion', 'outl']))
     # check_env(env)
@@ -55,14 +55,16 @@ if __name__ == '__main__':
     n_steps = 36
     for _ in range(n_steps):
         # Random action
-        action = env.action_space.sample()
+        # action = env.action_space.sample()
+        action = np.array([1., 1.])
         pr.enable()
         obs, reward, done, info = env.step(action)
         pr.disable()
         reward_sum += reward
         action_list.append(action)
         # print('Reward is: ', reward)
-        print(info['time'])
+        # print(info['time'])
+        print(obs)
         if done:
             print(f'Total reward is {reward_sum} \n')
             reward_list.append(reward_sum)

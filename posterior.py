@@ -20,7 +20,7 @@ class Posterior:
                 tf.tile(tf.range(self.batch_size)[:, tf.newaxis], [1, self.traj_len]),
                 tf.tile(tf.range(self.traj_len)[tf.newaxis, :], [self.batch_size, 1]),
                 tf.tile(self.code[:, tf.newaxis], [1, self.traj_len])
-            ], axis = 2), [-1, 3])
+            ], axis=2), [-1, 3])
             self.log_code_posterior = tf.reshape(
                 tf.log(tf.gather_nd(self.code_posterior_dist, self.code_posterior_idx)) / tf.log(2.0), 
                 [self.batch_size, self.traj_len]
